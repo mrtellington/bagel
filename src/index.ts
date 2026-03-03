@@ -1,4 +1,5 @@
 import { startScheduler } from "./scheduler.js";
+import { startSocketMode } from "./socket-mode.js";
 import { config } from "./config.js";
 
 console.log("=================================");
@@ -10,8 +11,10 @@ console.log(`  Asana: ${config.asanaProjectGid}`);
 console.log("=================================");
 
 startScheduler();
+startSocketMode().catch((err) => {
+  console.error("[socket-mode] Failed to start:", err);
+});
 
-// Keep process alive
 process.on("SIGTERM", () => {
   console.log("Bagel agent shutting down...");
   process.exit(0);

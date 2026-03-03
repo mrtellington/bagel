@@ -1,0 +1,23 @@
+[Unit]
+Description=Bagel Agent Service
+After=network.target
+
+[Service]
+Type=simple
+User=bagel
+WorkingDirectory=/opt/bagel
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+
+# Load secrets from environment file
+EnvironmentFile=/opt/bagel/.env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bagel
+
+[Install]
+WantedBy=multi-user.target

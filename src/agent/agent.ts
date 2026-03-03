@@ -199,6 +199,20 @@ const dbGetPendingItems = tool(
   }
 );
 
+const dbSearchMeetings = tool(
+  "db_search_meetings",
+  "Search past meetings by title keyword. Use when Tod asks about a specific meeting. Returns matching meetings with notes and attendees.",
+  {
+    query: z.string().describe("Search term to match against meeting titles"),
+    days_back: z.number().optional().describe("How many days back to search (default 7)"),
+    limit: z.number().optional().describe("Max results (default 10)"),
+  },
+  async ({ query: q, days_back, limit }) => {
+    const meetings = await db.searchMeetings(q, days_back ?? 7, limit ?? 10);
+    return { content: [{ type: "text" as const, text: JSON.stringify(meetings) }] };
+  }
+);
+
 // --- MCP Server ---
 
 const bagelTools = createSdkMcpServer({
@@ -208,7 +222,7 @@ const bagelTools = createSdkMcpServer({
     asanaCreateTask, asanaUpdateTask, asanaMoveToBacklog, asanaSearchTasks, asanaAddComment,
     calendarGetToday, calendarIsInMeeting, calendarNextGap,
     dbGetUnprocessedMeetings, dbMarkMeetingProcessed, dbCreateActionItem,
-    dbGetActionItems, dbUpdateActionItem, dbGetPendingItems,
+    dbGetActionItems, dbUpdateActionItem, dbGetPendingItems, dbSearchMeetings,
   ],
 });
 

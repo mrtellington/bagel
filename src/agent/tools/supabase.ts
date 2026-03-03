@@ -99,3 +99,18 @@ export async function markThreadReplyProcessed(
     });
   if (error) throw error;
 }
+
+export async function searchMeetings(titleQuery: string, daysBack: number = 7, limit: number = 10) {
+  const since = new Date();
+  since.setDate(since.getDate() - daysBack);
+
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id, title, event_datetime, attendees, enhanced_notes")
+    .ilike("title", `%${titleQuery}%`)
+    .gte("event_datetime", since.toISOString())
+    .order("event_datetime", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}

@@ -9,6 +9,7 @@ function required(key: string): string {
 export const config = {
   anthropicApiKey: required("ANTHROPIC_API_KEY"),
   slackBotToken: required("SLACK_BOT_TOKEN"),
+  slackAppToken: required("SLACK_APP_TOKEN"),
   asanaPat: required("ASANA_PAT"),
   supabaseUrl: required("SUPABASE_URL"),
   supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),

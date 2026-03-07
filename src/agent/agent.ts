@@ -98,7 +98,7 @@ const asanaAddComment = tool(
 
 const calendarGetToday = tool(
   "calendar_get_today_events",
-  "Get all of Tod's calendar events for today. Use for morning briefings and scheduling awareness.",
+  "Get all calendar events for today. Use for morning briefings and scheduling awareness.",
   {},
   async () => {
     const events = await calendar.getTodayEvents();
@@ -108,7 +108,7 @@ const calendarGetToday = tool(
 
 const calendarIsInMeeting = tool(
   "calendar_is_in_meeting",
-  "Check if Tod is currently in a meeting. Use before sending nudges.",
+  "Check if the owner is currently in a meeting. Use before sending nudges.",
   {},
   async () => {
     const inMeeting = await calendar.isInMeeting();
@@ -118,7 +118,7 @@ const calendarIsInMeeting = tool(
 
 const calendarNextGap = tool(
   "calendar_next_gap",
-  "Find the next free gap in Tod's calendar of at least N minutes.",
+  "Find the next free gap in the owner's calendar of at least N minutes.",
   { min_minutes: z.number().optional().describe("Minimum gap duration in minutes (default 15)") },
   async ({ min_minutes }) => {
     const gap = await calendar.getNextGap(min_minutes ?? 15);
@@ -201,7 +201,7 @@ const dbGetPendingItems = tool(
 
 const dbSearchMeetings = tool(
   "db_search_meetings",
-  "Search past meetings by title keyword. Use when Tod asks about a specific meeting. Returns matching meetings with notes and attendees.",
+  "Search past meetings by title keyword. Returns matching meetings with notes and attendees.",
   {
     query: z.string().describe("Search term to match against meeting titles"),
     days_back: z.number().optional().describe("How many days back to search (default 7)"),
@@ -228,25 +228,25 @@ const bagelTools = createSdkMcpServer({
 
 // --- System prompt ---
 
-const SYSTEM_PROMPT = `You are Bagel, Tod Ellington's executive assistant at Whitestone Branding.
+const SYSTEM_PROMPT = `You are Bagel, ${config.ownerName}'s executive assistant${config.orgName ? ` at ${config.orgName}` : ""}.
 
-Your job is to ensure no action item falls through the cracks after meetings. You extract action items, post them to Slack for Tod's triage, create Asana tasks based on his decisions, and nudge him when items are unaddressed.
+Your job is to ensure no action item falls through the cracks after meetings. You extract action items, post them to Slack for triage, create Asana tasks based on decisions, and nudge when items are unaddressed.
 
 ## Context
-- Tod is COO/CTO at Whitestone Branding (promotional products company)
-- His Asana email: ${config.todAsanaEmail}
-- His Slack user ID: ${config.todSlackUserId}
+${config.ownerTitle ? `- ${config.ownerName} is ${config.ownerTitle}${config.orgName ? ` at ${config.orgName}` : ""}` : `- Owner: ${config.ownerName}`}
+- Asana email: ${config.ownerAsanaEmail}
+- Slack user ID: ${config.ownerSlackUserId}
 - Task Triage project GID: ${config.asanaProjectGid}
 - Backlog section GID: ${config.asanaBacklogSectionGid}
-- Business hours: Monday-Friday, 9 AM - 6 PM Eastern
+- Business hours: Monday-Friday, ${config.businessHoursStart} - ${config.businessHoursEnd} ${config.timezone}
 
 ## When extracting action items from meetings:
 1. Only include items where someone committed to doing something or was assigned a task
 2. Do NOT include general discussion points, completed items, or informational updates
 3. Infer due dates from context (explicit dates, relative references like "by Friday", deadlines mentioned)
 4. Set priority: 🔴 high (client-facing, explicit deadlines, someone waiting), 🟡 medium (committed, no hard deadline), 🟢 low (milestones, nice-to-haves)
-5. For each item, suggest: own (Tod does it), delegate (assign to someone else), or park (backlog)
-6. Flag external participants who aren't Whitestone employees — they can't own Asana tasks, suggest an internal owner to follow up
+5. For each item, suggest: own (${config.ownerName} does it), delegate (assign to someone else), or park (backlog)
+6. Flag external participants who aren't ${config.orgName || "internal"} employees — they can't own Asana tasks, suggest an internal owner to follow up
 7. Search Asana for existing tasks that might match — flag with 🔗 if found
 
 ## When formatting Slack messages:
@@ -257,16 +257,16 @@ Your job is to ensure no action item falls through the cracks after meetings. Yo
 - End with "Reply in thread to triage ↓"
 
 ## When processing triage replies:
-- Tod will reply in the thread with natural language like "own 1,3 — delegate 2 to karie — park 4"
-- Interpret flexibly — he might say "give karie everything except 1" or "park the vendor stuff"
+- The owner will reply in the thread with natural language like "own 1,3 — delegate 2 to karie — park 4"
+- Interpret flexibly — they might say "give karie everything except 1" or "park the vendor stuff"
 - Create Asana tasks based on his decisions
 - Update the original Slack message with ✅ markers
 - Reply in thread confirming what was created
 
 ## When nudging:
-- Check if Tod is in a meeting first — don't nudge during meetings
-- Find gaps in his calendar to nudge
-- Be concise — he's busy
+- Check if the owner is in a meeting first — don't nudge during meetings
+- Find gaps in their calendar to nudge
+- Be concise — they're busy
 - Escalate tone after 4+ hours of no response`;
 
 // --- Agent invocation ---
@@ -279,8 +279,7 @@ export async function invokeAgent(prompt: string): Promise<string> {
     options: {
       systemPrompt: SYSTEM_PROMPT,
       mcpServers: { "bagel-tools": bagelTools },
-      permissionMode: "bypassPermissions",
-      allowDangerouslySkipPermissions: true,
+      permissionMode: "acceptEdits",
       model: "claude-sonnet-4-6",
       maxTurns: 20,
     },

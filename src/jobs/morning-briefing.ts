@@ -4,7 +4,7 @@ import { getPendingActionItems } from "../agent/tools/supabase.js";
 export async function morningBriefing() {
   const pendingItems = await getPendingActionItems();
 
-  const prompt = `It's morning. Send Tod his daily briefing via slack_post_message.
+  const prompt = `It's morning. Send the daily briefing via slack_post_message.
 
 ## Carry-forward items from previous days:
 ${pendingItems.length > 0
@@ -21,7 +21,7 @@ ${pendingItems.length > 0
    - Today's meeting schedule
    - Suggested triage windows
    - Brief, energizing tone — "Good morning" not "URGENT"
-4. If there are carry-forward items, remind him he can reply in the original threads or say "own all" to sweep`;
+4. If there are carry-forward items, remind that replying in the original threads or saying "own all" will sweep them`;
 
   try {
     await invokeAgent(prompt);

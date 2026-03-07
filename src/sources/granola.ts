@@ -1,5 +1,6 @@
 import { Source, SourceContent, Participant } from "./source.js";
 import { getUnprocessedMeetings, supabase } from "../agent/tools/supabase.js";
+import { config } from "../config.js";
 
 export class GranolaSource implements Source {
   name = "granola";
@@ -26,7 +27,9 @@ export class GranolaSource implements Source {
           name: a.name ?? "Unknown",
           email: a.email ?? "",
           organization: a.organization,
-          isExternal: a.email ? !a.email.endsWith("@whitestonebranding.com") : undefined,
+          isExternal: a.email && config.ownerAsanaEmail
+            ? !a.email.endsWith(`@${config.ownerAsanaEmail.split("@")[1]}`)
+            : undefined,
         }))
       : [];
 

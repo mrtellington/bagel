@@ -18,8 +18,8 @@ function getCalendarClient() {
 
 const calendarClient = getCalendarClient();
 
-// Tod's calendar ID — typically the primary email
-const CALENDAR_ID = config.todAsanaEmail;
+// Owner's calendar ID — typically the primary email
+const CALENDAR_ID = config.ownerAsanaEmail;
 
 export async function getTodayEvents() {
   if (!calendarClient) return [];

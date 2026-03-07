@@ -29,7 +29,7 @@ export async function eodDigest() {
   const triaged = (todayItems ?? []).filter((i) => i.status !== "pending_review");
   const pending = allPending ?? [];
 
-  const prompt = `It's end of day. Send Tod his EOD digest via slack_post_message.
+  const prompt = `It's end of day. Send the EOD digest via slack_post_message.
 
 ## Today's stats:
 - Meetings today: ${todayMeetings?.length ?? 0}

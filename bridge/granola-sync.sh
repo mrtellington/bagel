@@ -4,9 +4,9 @@
 
 set -euo pipefail
 
-SUPABASE_URL="${SUPABASE_URL:-https://ejaxcfnnavjsajdepfkw.supabase.co}"
-SUPABASE_KEY="${SUPABASE_SERVICE_ROLE_KEY}"
-SOURCE_UUID="6d5dd263-00df-49f9-a9ea-5319cbe204d4"
+SUPABASE_URL="${SUPABASE_URL:?Missing required env var: SUPABASE_URL}"
+SUPABASE_KEY="${SUPABASE_SERVICE_ROLE_KEY:?Missing required env var: SUPABASE_SERVICE_ROLE_KEY}"
+SOURCE_UUID="${GRANOLA_SOURCE_UUID:?Missing required env var: GRANOLA_SOURCE_UUID}"
 LOG_FILE="${HOME}/.bagel/bridge.log"
 
 mkdir -p "$(dirname "$LOG_FILE")"

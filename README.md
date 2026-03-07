@@ -14,46 +14,10 @@ You can also DM the Bagel bot directly to ask questions like: "What did I commit
 
 ---
 
-## Current Status
-
-> **As of 2026-03-07**
-
-| Component | Status |
-|-----------|--------|
-| Full agent implementation (Tasks 1-16) | Complete — committed to `main` |
-| Socket Mode DM handler | Complete — committed to `main` |
-| GCP VM deployment (`bagel-vm`) | Running — `us-east1-b` |
-| Granola MCP bridge cron | Running on VM |
-| Cron scheduler (5 jobs) | Running |
-| **Socket Mode activation** | **BLOCKED** — needs `SLACK_APP_TOKEN` |
-
-### Only Remaining Blocker
-
-Tod must complete these steps in the [Slack app dashboard](https://api.slack.com/apps/A0ACT45NCGP):
-
-1. **Basic Information > App-Level Tokens** — Generate token with `connections:write` scope, copy the `xapp-1-...` value
-2. **Socket Mode** (sidebar) — Toggle ON
-3. **Event Subscriptions** — Toggle ON, add bot event `message.im`, Save
-4. **App Home** — Enable "Allow users to send Slash commands and messages from the messages tab"
-
-Then add the token to `.env` and the VM:
-
-```bash
-# Local .env
-SLACK_APP_TOKEN=xapp-1-...
-
-# VM
-gcloud compute ssh bagel-vm --zone=us-east1-b --command="echo 'SLACK_APP_TOKEN=xapp-1-...' | sudo tee -a /opt/bagel/.env && sudo chmod 600 /opt/bagel/.env && sudo chown bagel:bagel /opt/bagel/.env && sudo systemctl restart bagel"
-```
-
-Full deployment steps: [`.claude/handoffs/2026-03-06-095757-socket-mode-setup-pending.md`](.claude/handoffs/2026-03-06-095757-socket-mode-setup-pending.md)
-
----
-
 ## Architecture
 
 ```
-GCP COMPUTE ENGINE (bagel-vm, e2-small, us-east1-b)
+GCP COMPUTE ENGINE (VM, e2-small)
 +-----------------------------------------------------+
 |                                                      |
 |  GRANOLA MCP BRIDGE              BAGEL AGENT SERVICE |
@@ -75,7 +39,7 @@ GCP COMPUTE ENGINE (bagel-vm, e2-small, us-east1-b)
          |              |              |
     +----+----+    +----+---+    +----+---+
     |Supabase |    | Slack  |    | Asana  |
-    |(state)  |    |(Bagel) |    |(tasks) |
+    |(state)  |    |(bot)   |    |(tasks) |
     +---------+    +--------+    +--------+
 ```
 
@@ -97,7 +61,7 @@ GCP COMPUTE ENGINE (bagel-vm, e2-small, us-east1-b)
 3. EXTRACT -- Claude analyzes content, extracts action items with:
               due dates, priority, suggested triage (own/delegate/park),
               external participant flags, existing Asana task matches
-4. POST    -- Agent formats and posts to Bagel Slack DM (D0AD2PW9GAX)
+4. POST    -- Agent formats and posts to Slack DM channel
 5. TRIAGE  -- Agent monitors thread for replies, interprets natural language, acts
 6. NUDGE   -- Agent checks for unaddressed items and sends reminders
 ```
@@ -112,7 +76,7 @@ GCP COMPUTE ENGINE (bagel-vm, e2-small, us-east1-b)
 | Morning briefing | 8:55 AM ET | Daily summary + open items |
 | End-of-day digest | 5:45 PM ET | Triage summary + carry-forward |
 
-All loops respect business hours: **Monday-Friday, 9:00 AM - 6:00 PM ET**.
+All loops respect business hours (configurable via env vars, default Monday-Friday 9 AM - 6 PM ET).
 
 ---
 
@@ -122,21 +86,21 @@ All loops respect business hours: **Monday-Friday, 9:00 AM - 6:00 PM ET**.
 
 ```
 =====================================
-BCSI + Whitestone
+Meeting Title
 Feb 27 . 45 min . 5 attendees
 =====================================
 
-Topics: print integration, business card program, Liftoff setup
+Topics: integration, business card program, setup
 
 -- Action Items ----------------------
 
-1. [ ] [HIGH] Remind Cristian Monday about SOW development
+1. [ ] [HIGH] Follow up on SOW development
    due: Mon Mar 3 . priority: high
    -> suggesting: own
 
-2. [ ] [MED]  Register for PrintForce portal
+2. [ ] [MED]  Register for portal
    due: Tue Mar 4 . priority: medium
-   -> suggesting: delegate to Karie
+   -> suggesting: delegate to team member
 
 Reply in thread to triage
 ```
@@ -181,8 +145,8 @@ bagel/
 │       ├── poll-meetings.ts        # Detect new meetings -> invoke agent
 │       ├── poll-threads.ts         # Check Slack replies -> invoke agent
 │       ├── nudge.ts                # Check unaddressed items -> send reminders
-│       ├── morning-briefing.ts     # 8:55 AM ET daily job
-│       └── eod-digest.ts           # 5:45 PM ET daily job
+│       ├── morning-briefing.ts     # Morning daily job
+│       └── eod-digest.ts          # Evening daily job
 ├── bridge/
 │   ├── granola-sync.sh             # Claude CLI script for Granola MCP polling
 │   └── install-bridge-cron.sh      # Sets up crontab on the VM
@@ -203,25 +167,28 @@ bagel/
 
 ## Environment Variables
 
-All secrets are stored in Google Secret Manager on the VM. Locally, use a `.env` file (gitignored). See `.env.example` for the full template.
+All secrets should be stored securely (e.g., GCP Secret Manager for production). Locally, use a `.env` file (gitignored). See `.env.example` for the full template.
 
 | Variable | Description |
 |----------|-------------|
 | `ANTHROPIC_API_KEY` | Claude API access |
-| `SLACK_BOT_TOKEN` | Bagel Slack app bot token (`xoxb-...`) |
-| `SLACK_APP_TOKEN` | **NEW — not yet set** Socket Mode token (`xapp-1-...`) |
+| `SLACK_BOT_TOKEN` | Slack app bot token (`xoxb-...`) |
+| `SLACK_APP_TOKEN` | Socket Mode token (`xapp-1-...`) |
 | `ASANA_PAT` | Asana Personal Access Token |
-| `SUPABASE_URL` | `https://ejaxcfnnavjsajdepfkw.supabase.co` |
+| `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
-| `GOOGLE_CALENDAR_CREDENTIALS` | Service account JSON (base64) |
-| `SLACK_CHANNEL_ID` | `D0AD2PW9GAX` (Tod's DM with Bagel bot) |
-| `ASANA_WORKSPACE_GID` | Whitestone Asana workspace |
-| `ASANA_PROJECT_GID` | `1212738213310157` (Task Triage) |
-| `ASANA_BACKLOG_SECTION_GID` | `1213139850291370` |
-| `GRANOLA_SOURCE_UUID` | `6d5dd263-00df-49f9-a9ea-5319cbe204d4` |
-| `TOD_SLACK_USER_ID` | `U07GQ171UTZ` |
-| `TOD_ASANA_EMAIL` | `tod.ellington@whitestonebranding.com` |
-| `TIMEZONE` | `America/New_York` |
+| `GOOGLE_CALENDAR_SA_KEY_BASE64` | Service account JSON (base64) |
+| `SLACK_CHANNEL_ID` | DM channel with the bot |
+| `ASANA_WORKSPACE_GID` | Asana workspace ID |
+| `ASANA_PROJECT_GID` | Task Triage project ID |
+| `ASANA_BACKLOG_SECTION_GID` | Backlog section ID |
+| `GRANOLA_SOURCE_UUID` | Granola source identifier |
+| `OWNER_SLACK_USER_ID` | Slack user ID for the owner |
+| `OWNER_ASANA_EMAIL` | Owner's Asana email |
+| `OWNER_NAME` | Display name (used in prompts) |
+| `OWNER_TITLE` | Title/role (optional) |
+| `ORG_NAME` | Organization name (optional) |
+| `TIMEZONE` | Default: `America/New_York` |
 
 ---
 
@@ -231,17 +198,15 @@ All secrets are stored in Google Secret Manager on the VM. Locally, use a `.env`
 |-----------|------------|
 | Runtime | Node.js 20 / TypeScript (ESM, NodeNext) |
 | AI reasoning | `@anthropic-ai/claude-agent-sdk` — `claude-sonnet-4-6` |
-| State | Supabase (Postgres) — project `ejaxcfnnavjsajdepfkw` |
+| State | Supabase (Postgres) |
 | Slack | `@slack/web-api` + `@slack/socket-mode` |
 | Asana | Asana REST API (Personal Access Token) |
 | Calendar | Google Calendar API (service account — no OAuth) |
 | Meetings source | Granola MCP via Claude CLI bridge |
 | Scheduler | `node-cron` + `luxon` (timezone-aware) |
-| Deploy | GCP Compute Engine `bagel-vm` (e2-small, `us-east1-b`) |
-| Process manager | systemd (`bagel.service`) |
-| CI/CD | Google Cloud Build (`infra/cloudbuild.yaml`) |
-
-**Cost: ~$15/mo** (Compute Engine ~$13/mo + API usage ~$0.50-$0.80/day)
+| Deploy | GCP Compute Engine (e2-small) |
+| Process manager | systemd |
+| CI/CD | Google Cloud Build |
 
 ---
 
@@ -250,7 +215,7 @@ All secrets are stored in Google Secret Manager on the VM. Locally, use a `.env`
 ```bash
 npm install
 cp .env.example .env
-# Fill in .env values (credentials are in config-values.md, not committed to repo)
+# Fill in .env values with your own credentials
 npm run build
 npm start
 ```
@@ -260,8 +225,8 @@ npm start
 ```bash
 npm run build
 tar czf /tmp/bagel-update.tar.gz dist/ package.json package-lock.json
-gcloud compute scp --zone=us-east1-b /tmp/bagel-update.tar.gz bagel-vm:/tmp/
-gcloud compute ssh bagel-vm --zone=us-east1-b --command="cd /opt/bagel && sudo -u bagel tar xzf /tmp/bagel-update.tar.gz && sudo -u bagel npm ci --omit=dev && sudo systemctl restart bagel && sleep 3 && sudo systemctl status bagel --no-pager"
+gcloud compute scp --zone=<your-zone> /tmp/bagel-update.tar.gz <your-vm>:/tmp/
+gcloud compute ssh <your-vm> --zone=<your-zone> --command="cd /opt/bagel && sudo -u bagel tar xzf /tmp/bagel-update.tar.gz && sudo -u bagel npm ci --omit=dev && sudo systemctl restart bagel && sleep 3 && sudo systemctl status bagel --no-pager"
 ```
 
 > Always use the tarball pattern — direct directory copies cause a `dist/dist/index.js` nesting bug.
@@ -269,35 +234,8 @@ gcloud compute ssh bagel-vm --zone=us-east1-b --command="cd /opt/bagel && sudo -
 ## View VM Logs
 
 ```bash
-gcloud compute ssh bagel-vm --zone=us-east1-b --command="sudo journalctl -u bagel -n 50 --no-pager"
+gcloud compute ssh <your-vm> --zone=<your-zone> --command="sudo journalctl -u bagel -n 50 --no-pager"
 ```
-
----
-
-## Services & IDs
-
-| Service | ID | Status |
-|---------|----|--------|
-| Supabase project | `ejaxcfnnavjsajdepfkw` | Active |
-| Slack App "Bagel" | `A0ACT45NCGP` | Installed in Whitestone |
-| Asana Task Triage | `1212738213310157` | Active |
-| Asana Backlog section | `1213139850291370` | Active |
-| GCP VM | `bagel-vm`, zone `us-east1-b` | Running |
-| n8n Meeting Intake | `xE1wftiN4UYKsfzU` | Active — keep until switchover |
-| n8n Slack Action Handler | `a8jEkq30GFAjOTNd` | Active — keep until switchover |
-| Zapier Zap | `347428399` | LIVE — don't change until new agent is verified |
-
----
-
-## Handoff Documents
-
-Session handoffs are in `.claude/handoffs/` — read in order for project history:
-
-| File | Summary |
-|------|---------|
-| `2026-02-07-...bagel-phase1-supabase-edge-functions.md` | Phase 1 (Supabase Edge Functions) — superseded, never implemented |
-| `2026-03-02-...bagel-v2-agent-design-and-plan.md` | Design + 18-task plan complete, no code yet |
-| `2026-03-06-...socket-mode-setup-pending.md` | **Current** — all code done, blocked on Slack app-level token |
 
 ---
 
@@ -306,8 +244,6 @@ Session handoffs are in `.claude/handoffs/` — read in order for project histor
 Full 18-task plan: [`docs/plans/2026-03-02-bagel-implementation-plan.md`](docs/plans/2026-03-02-bagel-implementation-plan.md)
 
 Architecture and design rationale: [`docs/plans/2026-03-02-bagel-agent-design.md`](docs/plans/2026-03-02-bagel-agent-design.md)
-
-All 18 tasks have been implemented. Socket Mode DM handler was added as a follow-on feature in 4 additional commits after the main implementation.
 
 ---
 
@@ -325,6 +261,7 @@ All 18 tasks have been implemented. Socket Mode DM handler was added as a follow
 ## Security Notes
 
 - `.env` is gitignored — never commit it
-- Actual credentials are in `/Users/todellington/docs/plans/config-values.md` (local only, not in repo)
-- VM uses GCP Secret Manager for production secrets
-- `config.ts` uses a `required()` helper that throws at startup if any env var is missing — intentional
+- All credentials must be provided via environment variables — no defaults
+- VM deployment should use a secrets manager (e.g., GCP Secret Manager)
+- `config.ts` uses a `required()` helper that throws at startup if any env var is missing
+- User input in Slack messages is delimited and sanitized before being passed to AI prompts

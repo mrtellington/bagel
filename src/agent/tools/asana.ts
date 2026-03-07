@@ -13,7 +13,8 @@ async function asanaFetch(path: string, options: RequestInit = {}) {
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Asana API error ${res.status}: ${body}`);
+    console.error(`[asana] API error ${res.status}: ${body}`);
+    throw new Error(`Asana API error ${res.status}`);
   }
   return res.json();
 }
@@ -54,7 +55,7 @@ export async function addTaskToSection(taskGid: string, sectionGid: string) {
 
 export async function searchTasks(query: string) {
   const result = await asanaFetch(
-    `/workspaces/1201405786124364/tasks/search?text=${encodeURIComponent(query)}&opt_fields=name,completed,assignee.name,due_on,projects.name&limit=10`
+    `/workspaces/${config.asanaWorkspaceGid}/tasks/search?text=${encodeURIComponent(query)}&opt_fields=name,completed,assignee.name,due_on,projects.name&limit=10`
   );
   return result.data ?? [];
 }
@@ -69,7 +70,7 @@ export async function addComment(taskGid: string, text: string) {
 export async function findUserByEmail(email: string) {
   try {
     const result = await asanaFetch(
-      `/workspaces/1201405786124364/users?opt_fields=name,email`
+      `/workspaces/${config.asanaWorkspaceGid}/users?opt_fields=name,email`
     );
     const users = result.data ?? [];
     return users.find(

@@ -54,7 +54,7 @@ export async function checkNudges() {
 
   if (needsNudge.length === 0) return;
 
-  const prompt = `Time to nudge Tod about unaddressed action items.
+  const prompt = `Time to nudge ${config.ownerName} about unaddressed action items.
 
 ## Pending items:
 ${needsNudge.map((n) => `- "${n.meetingTitle}": ${n.itemCount} items, ${n.hoursSincePost}h since posted, nudged ${n.nudgeCount} times`).join("\n")}
@@ -62,10 +62,10 @@ ${needsNudge.map((n) => `- "${n.meetingTitle}": ${n.itemCount} items, ${n.hoursS
 ## Your tasks:
 1. First, check if Tod is currently in a meeting (calendar_is_in_meeting)
 2. If he IS in a meeting, find the next gap (calendar_next_gap) and skip this nudge
-3. If he is NOT in a meeting, send a nudge via slack_post_message (NOT in a thread — direct message)
+3. If not in a meeting, send a nudge via slack_post_message (NOT in a thread — direct message)
 4. Tone: ${needsNudge.some((n) => n.nudgeCount >= 2) ? "Firmer — these items have been waiting. Mention the risk of things slipping." : "Gentle — just a reminder. Keep it brief."}
 5. Include meeting names and item counts
-6. If there's a gap before his next meeting, mention it: "You've got X minutes before your next meeting"
+6. If there's a gap before the next meeting, mention it: "You've got X minutes before your next meeting"
 
 After nudging, update each pending item's nudge_count and last_nudge_at via db_update_action_item.`;
 

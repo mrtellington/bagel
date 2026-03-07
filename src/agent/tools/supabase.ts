@@ -104,13 +104,18 @@ export async function searchMeetings(titleQuery: string, daysBack: number = 7, l
   const since = new Date();
   since.setDate(since.getDate() - daysBack);
 
+  // Sanitize search input: escape SQL LIKE wildcards and limit length
+  const sanitized = titleQuery
+    .slice(0, 100)
+    .replace(/[%_\\]/g, (c) => `\\${c}`);
+
   const { data, error } = await supabase
     .from("meetings")
     .select("id, title, event_datetime, attendees, enhanced_notes")
-    .ilike("title", `%${titleQuery}%`)
+    .ilike("title", `%${sanitized}%`)
     .gte("event_datetime", since.toISOString())
     .order("event_datetime", { ascending: false })
-    .limit(limit);
+    .limit(Math.min(limit, 50));
   if (error) throw error;
   return data ?? [];
 }

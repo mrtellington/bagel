@@ -259,7 +259,7 @@ ${config.ownerTitle ? `- ${config.ownerName} is ${config.ownerTitle}${config.org
 ## When processing triage replies:
 - The owner will reply in the thread with natural language like "own 1,3 — delegate 2 to karie — park 4"
 - Interpret flexibly — they might say "give karie everything except 1" or "park the vendor stuff"
-- Create Asana tasks based on his decisions
+- Create Asana tasks based on their decisions
 - Update the original Slack message with ✅ markers
 - Reply in thread confirming what was created
 

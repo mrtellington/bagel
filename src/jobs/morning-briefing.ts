@@ -15,7 +15,7 @@ ${pendingItems.length > 0
 
 ## Your tasks:
 1. Get today's calendar (calendar_get_today_events)
-2. Identify triage gaps — windows between meetings where Tod could triage items
+2. Identify triage gaps — windows between meetings where items could be triaged
 3. Post a morning briefing to Slack with:
    - Carry-forward open items (grouped by meeting)
    - Today's meeting schedule

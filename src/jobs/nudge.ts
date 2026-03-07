@@ -60,8 +60,8 @@ export async function checkNudges() {
 ${needsNudge.map((n) => `- "${n.meetingTitle}": ${n.itemCount} items, ${n.hoursSincePost}h since posted, nudged ${n.nudgeCount} times`).join("\n")}
 
 ## Your tasks:
-1. First, check if Tod is currently in a meeting (calendar_is_in_meeting)
-2. If he IS in a meeting, find the next gap (calendar_next_gap) and skip this nudge
+1. First, check if ${config.ownerName} is currently in a meeting (calendar_is_in_meeting)
+2. If in a meeting, find the next gap (calendar_next_gap) and skip this nudge
 3. If not in a meeting, send a nudge via slack_post_message (NOT in a thread — direct message)
 4. Tone: ${needsNudge.some((n) => n.nudgeCount >= 2) ? "Firmer — these items have been waiting. Mention the risk of things slipping." : "Gentle — just a reminder. Keep it brief."}
 5. Include meeting names and item counts

@@ -21,14 +21,21 @@ export class GranolaSource implements Source {
     return this.toSourceContent(data);
   }
 
+  private getOrgDomain(): string | undefined {
+    const email = config.ownerAsanaEmail;
+    const atIndex = email.indexOf("@");
+    return atIndex >= 0 ? email.slice(atIndex + 1) : undefined;
+  }
+
   private toSourceContent(meeting: Record<string, any>): SourceContent {
+    const orgDomain = this.getOrgDomain();
     const attendees: Participant[] = Array.isArray(meeting.attendees)
       ? meeting.attendees.map((a: any) => ({
           name: a.name ?? "Unknown",
           email: a.email ?? "",
           organization: a.organization,
-          isExternal: a.email && config.ownerAsanaEmail
-            ? !a.email.endsWith(`@${config.ownerAsanaEmail.split("@")[1]}`)
+          isExternal: a.email && orgDomain
+            ? !a.email.endsWith(`@${orgDomain}`)
             : undefined,
         }))
       : [];

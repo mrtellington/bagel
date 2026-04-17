@@ -114,3 +114,93 @@ export async function searchMeetings(titleQuery: string, daysBack: number = 7, l
   if (error) throw error;
   return data ?? [];
 }
+
+// --- Obsidian note cache ---
+
+export async function upsertObsidianNote(note: {
+  file_path: string;
+  title?: string;
+  source?: string;
+  captured_at?: string;
+  tags?: string[];
+  status?: string;
+  bagel_processed?: boolean;
+  body?: string;
+  frontmatter?: Record<string, unknown>;
+}) {
+  const { error } = await supabase
+    .from("obsidian_notes")
+    .upsert(
+      { ...note, updated_at: new Date().toISOString() },
+      { onConflict: "file_path" }
+    );
+  if (error) throw error;
+}
+
+export async function searchObsidianNotes(query: string, limit: number = 10) {
+  const { data, error } = await supabase
+    .from("obsidian_notes")
+    .select("*")
+    .or(`title.ilike.%${query}%,body.ilike.%${query}%`)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getRecentObsidianNotes(limit: number = 10) {
+  const { data, error } = await supabase
+    .from("obsidian_notes")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getUnprocessedObsidianInbox() {
+  const { data, error } = await supabase
+    .from("obsidian_notes")
+    .select("*")
+    .eq("bagel_processed", false)
+    .like("file_path", "00-inbox/%")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function enqueueObsidianWrite(operation: "create" | "update", filePath: string, content: string) {
+  const { data, error } = await supabase
+    .from("obsidian_queue")
+    .insert({ operation, file_path: filePath, content })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getUncommittedObsidianWrites() {
+  const { data, error } = await supabase
+    .from("obsidian_queue")
+    .select("*")
+    .is("committed_at", null)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function markObsidianWriteCommitted(queueId: string) {
+  const { error } = await supabase
+    .from("obsidian_queue")
+    .update({ committed_at: new Date().toISOString() })
+    .eq("id", queueId);
+  if (error) throw error;
+}
+
+export async function deleteObsidianNote(filePath: string) {
+  const { error } = await supabase
+    .from("obsidian_notes")
+    .delete()
+    .eq("file_path", filePath);
+  if (error) throw error;
+}

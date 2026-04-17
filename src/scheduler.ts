@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { DateTime } from "luxon";
 import { config } from "./config.js";
 import { pollMeetings } from "./jobs/poll-meetings.js";
+import { pollVault } from "./jobs/poll-vault.js";
 import { pollThreads } from "./jobs/poll-threads.js";
 import { checkNudges } from "./jobs/nudge.js";
 import { morningBriefing } from "./jobs/morning-briefing.js";
@@ -39,6 +40,9 @@ export function startScheduler() {
 
   // Poll Supabase for new meetings — every 5 minutes
   cron.schedule("*/5 * * * *", guardedJob("poll-meetings", pollMeetings));
+
+  // Poll Obsidian vault for new notes — every 5 minutes
+  cron.schedule("*/5 * * * *", guardedJob("poll-vault", pollVault));
 
   // Poll Slack threads for replies — every 2 minutes
   cron.schedule("*/2 * * * *", guardedJob("poll-threads", pollThreads));

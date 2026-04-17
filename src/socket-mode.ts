@@ -37,7 +37,34 @@ socketMode.on("message", async ({ event, ack }: { event: Record<string, any>; ac
 async function handleDirectMessage(event: Record<string, any>) {
   const text = event.text ?? "";
 
-  const prompt = `Tod sent you a direct message in Slack:
+  // Detect URLs — if the message contains a link, route to vault capture
+  const urlMatch = text.match(/https?:\/\/[^\s>]+/);
+  const isCapture = urlMatch && (
+    text.toLowerCase().includes("save") ||
+    text.toLowerCase().includes("clip") ||
+    text.toLowerCase().includes("capture") ||
+    // If the message is mostly just a URL, treat it as a capture
+    text.trim().replace(urlMatch[0], "").trim().length < 20
+  );
+
+  const prompt = isCapture
+    ? `Tod shared a URL in Slack and wants to save it to his Obsidian vault.
+
+His message: "${text}"
+Detected URL: ${urlMatch![0]}
+
+## Your tasks:
+1. Use vault_create_note to create a note in 00-inbox with:
+   - title: infer from the URL or surrounding text
+   - source: the URL
+   - body: "Captured from Slack. Awaiting content extraction."
+   - tags: infer 2-3 tags from context
+2. Search the vault for related notes (vault_search)
+3. Reply via slack_post_message with:
+   - Confirmation that it was saved
+   - Any related notes you found
+   - Ask: "Want me to summarize it or file it somewhere specific?"`
+    : `Tod sent you a direct message in Slack:
 
 "${text}"
 
@@ -46,10 +73,13 @@ Respond helpfully. You have access to tools for:
 - Checking calendar (calendar_get_today_events)
 - Searching Asana tasks (asana_search_tasks)
 - Getting pending action items (db_get_pending_action_items)
+- Searching the Obsidian vault (vault_search)
+- Listing recent vault notes (vault_list_recent)
+- Creating vault notes (vault_create_note)
 - Posting Slack messages (slack_post_message)
 
 Respond by posting a Slack message in the DM channel. Be concise and helpful.
-If you search for meetings or tasks, summarize the results in a readable format.
+If you search for meetings, tasks, or vault notes, summarize the results in a readable format.
 If you don't find what Tod is looking for, say so and suggest alternatives.`;
 
   const response = await invokeAgent(prompt);

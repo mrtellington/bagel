@@ -24,4 +24,6 @@ export const config = {
   businessHoursEnd: process.env.BUSINESS_HOURS_END ?? "18:00",
   todSlackUserId: process.env.TOD_SLACK_USER_ID ?? "U07GQ171UTZ",
   todAsanaEmail: process.env.TOD_ASANA_EMAIL ?? "tod.ellington@whitestonebranding.com",
+  obsidianRepoUrl: required("OBSIDIAN_REPO_URL"),
+  obsidianLocalPath: process.env.OBSIDIAN_LOCAL_PATH ?? "/opt/bagel/vault",
 } as const;

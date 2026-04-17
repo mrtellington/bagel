@@ -8,6 +8,7 @@ console.log(`  Timezone: ${config.timezone}`);
 console.log(`  Hours: ${config.businessHoursStart} - ${config.businessHoursEnd}`);
 console.log(`  Slack: ${config.slackChannelId}`);
 console.log(`  Asana: ${config.asanaProjectGid}`);
+console.log(`  Vault: ${config.obsidianRepoUrl.split("/").pop()?.replace(".git", "")}`);
 console.log("=================================");
 
 startScheduler();

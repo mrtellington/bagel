@@ -5,6 +5,7 @@ import * as slack from "./tools/slack.js";
 import * as asana from "./tools/asana.js";
 import * as calendar from "./tools/calendar.js";
 import * as db from "./tools/supabase.js";
+import * as vault from "./tools/obsidian.js";
 
 // --- Tool definitions ---
 
@@ -213,6 +214,65 @@ const dbSearchMeetings = tool(
   }
 );
 
+const vaultSearchTool = tool(
+  "vault_search",
+  "Search the Obsidian vault by keyword. Searches note titles and body text. Use to answer knowledge queries like 'what do I know about AI agents?'",
+  {
+    query: z.string().describe("Search term"),
+    limit: z.number().optional().describe("Max results (default 10)"),
+  },
+  async ({ query: q, limit }) => {
+    const results = await vault.vaultSearch(q, limit ?? 10);
+    return { content: [{ type: "text" as const, text: JSON.stringify(results) }] };
+  }
+);
+
+const vaultCreateNoteTool = tool(
+  "vault_create_note",
+  "Create a new note in the Obsidian vault. Default folder is 00-inbox. Use when Tod shares a URL or asks to save something.",
+  {
+    title: z.string().describe("Note title"),
+    body: z.string().describe("Note body in markdown"),
+    folder: z.string().optional().describe("Target folder (default: 00-inbox). Options: 00-inbox, 10-articles, 20-meetings, 30-projects, 40-people, 50-reference"),
+    source: z.string().optional().describe("Source URL if captured from web"),
+    tags: z.array(z.string()).optional().describe("Tags for the note"),
+  },
+  async ({ title, body, folder, source, tags }) => {
+    const result = await vault.vaultCreateNote({ title, body, folder, source, tags });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  }
+);
+
+const vaultUpdateNoteTool = tool(
+  "vault_update_note",
+  "Update an existing Obsidian note. Can change frontmatter fields (tags, status, bagel-processed) or replace the body.",
+  {
+    file_path: z.string().describe("Relative vault path, e.g. '00-inbox/2026-04-16-article.md'"),
+    frontmatter_updates: z.record(z.string(), z.unknown()).optional().describe("Frontmatter fields to update"),
+    new_body: z.string().optional().describe("New body content (replaces existing body)"),
+  },
+  async ({ file_path, frontmatter_updates, new_body }) => {
+    const result = await vault.vaultUpdateNote({
+      filePath: file_path,
+      frontmatterUpdates: frontmatter_updates,
+      newBody: new_body,
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  }
+);
+
+const vaultListRecentTool = tool(
+  "vault_list_recent",
+  "List the N most recently captured notes in the Obsidian vault. Use for 'what have I saved recently?' queries.",
+  {
+    limit: z.number().optional().describe("Number of results (default 10)"),
+  },
+  async ({ limit }) => {
+    const results = await vault.vaultListRecent(limit ?? 10);
+    return { content: [{ type: "text" as const, text: JSON.stringify(results) }] };
+  }
+);
+
 // --- MCP Server ---
 
 const bagelTools = createSdkMcpServer({
@@ -223,6 +283,7 @@ const bagelTools = createSdkMcpServer({
     calendarGetToday, calendarIsInMeeting, calendarNextGap,
     dbGetUnprocessedMeetings, dbMarkMeetingProcessed, dbCreateActionItem,
     dbGetActionItems, dbUpdateActionItem, dbGetPendingItems, dbSearchMeetings,
+    vaultSearchTool, vaultCreateNoteTool, vaultUpdateNoteTool, vaultListRecentTool,
   ],
 });
 
@@ -267,7 +328,33 @@ Your job is to ensure no action item falls through the cracks after meetings. Yo
 - Check if Tod is in a meeting first — don't nudge during meetings
 - Find gaps in his calendar to nudge
 - Be concise — he's busy
-- Escalate tone after 4+ hours of no response`;
+- Escalate tone after 4+ hours of no response
+
+## Obsidian Knowledge Vault
+You have access to Tod's Obsidian vault — his long-term knowledge brain.
+
+Vault structure:
+- 00-inbox: new captures waiting for review
+- 10-articles: processed articles and reads
+- 20-meetings: meeting notes
+- 30-projects: project notes
+- 40-people: contact notes
+- 50-reference: evergreen reference material
+
+When Tod shares a URL or says "save this":
+1. Use vault_create_note to save it to 00-inbox with title, source URL, and tags
+2. Respond with a summary and ask if he wants you to file it or ask questions to draw out his thinking
+
+When Tod asks a knowledge question ("what do I know about X?"):
+1. Use vault_search to find relevant notes
+2. Summarize findings, highlight cross-note connections
+3. If relevant Asana tasks exist, mention them
+
+When processing inbox items proactively:
+1. Summarize the content
+2. Suggest tags and a target folder
+3. Note any connections to existing vault notes
+4. Ask Tod if he wants to file it or discuss it further`;
 
 // --- Agent invocation ---
 

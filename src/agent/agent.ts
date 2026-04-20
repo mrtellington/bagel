@@ -79,10 +79,24 @@ const asanaMoveToBacklog = tool(
 
 const asanaSearchTasks = tool(
   "asana_search_tasks",
-  "Search for existing Asana tasks by text query. Use to find potential duplicates before creating.",
-  { query: z.string().describe("Search text") },
+  "Search for existing Asana tasks by text in the title. Use only to find duplicates before creating. Does NOT filter by assignee or due date — use asana_get_my_tasks for that.",
+  { query: z.string().describe("Search text matched against task titles") },
   async ({ query: q }) => {
     const tasks = await asana.searchTasks(q);
+    return { content: [{ type: "text" as const, text: JSON.stringify(tasks) }] };
+  }
+);
+
+const asanaGetMyTasks = tool(
+  "asana_get_my_tasks",
+  "Get Tod's incomplete Asana tasks (assigned to him, across all projects). Optionally filter by a due-date window. Use for 'my overdue tasks', 'tasks due Monday', 'what's on my plate'.",
+  {
+    due_before: z.string().optional().describe("YYYY-MM-DD — only tasks with due_on ≤ this date"),
+    due_after: z.string().optional().describe("YYYY-MM-DD — only tasks with due_on ≥ this date"),
+    include_completed: z.boolean().optional().describe("Default false. If true, include tasks completed in the last ~2 weeks."),
+  },
+  async ({ due_before, due_after, include_completed }) => {
+    const tasks = await asana.getMyTasks({ dueBefore: due_before, dueAfter: due_after, includeCompleted: include_completed });
     return { content: [{ type: "text" as const, text: JSON.stringify(tasks) }] };
   }
 );
@@ -103,6 +117,18 @@ const calendarGetToday = tool(
   {},
   async () => {
     const events = await calendar.getTodayEvents();
+    return { content: [{ type: "text" as const, text: JSON.stringify(events) }] };
+  }
+);
+
+const calendarGetEvents = tool(
+  "calendar_get_events",
+  "Get Tod's calendar events for a specific date (e.g. Monday, tomorrow, 2026-04-21). Use when Tod asks about any day other than today.",
+  {
+    date: z.string().describe("Date in YYYY-MM-DD format, in Tod's timezone (America/New_York). Resolve relative dates like 'Monday' or 'tomorrow' to an absolute YYYY-MM-DD before calling."),
+  },
+  async ({ date }) => {
+    const events = await calendar.getEventsForDate(date);
     return { content: [{ type: "text" as const, text: JSON.stringify(events) }] };
   }
 );
@@ -291,8 +317,8 @@ const bagelTools = createSdkMcpServer({
   name: "bagel-tools",
   tools: [
     slackPostMessage, slackUpdateMessage, slackGetThreadReplies,
-    asanaCreateTask, asanaUpdateTask, asanaMoveToBacklog, asanaSearchTasks, asanaAddComment,
-    calendarGetToday, calendarIsInMeeting, calendarNextGap,
+    asanaCreateTask, asanaUpdateTask, asanaMoveToBacklog, asanaSearchTasks, asanaAddComment, asanaGetMyTasks,
+    calendarGetToday, calendarGetEvents, calendarIsInMeeting, calendarNextGap,
     dbGetUnprocessedMeetings, dbMarkMeetingProcessed, dbCreateActionItem,
     dbGetActionItems, dbUpdateActionItem, dbGetPendingItems, dbSearchMeetings,
     vaultSearchTool, vaultCreateNoteTool, vaultUpdateNoteTool, vaultListRecentTool, vaultDeleteNoteTool,
@@ -304,6 +330,13 @@ const bagelTools = createSdkMcpServer({
 const SYSTEM_PROMPT = `You are Bagel, Tod Ellington's executive assistant at Whitestone Branding.
 
 Your job is to ensure no action item falls through the cracks after meetings. You extract action items, post them to Slack for Tod's triage, create Asana tasks based on his decisions, and nudge him when items are unaddressed.
+
+## Tool honesty — CRITICAL
+Only answer from data your tools actually return. Never fill in a plausible-sounding answer you didn't verify.
+- Date questions: if Tod asks about a day other than today, resolve the date (today is provided in your prompts) and call calendar_get_events with that YYYY-MM-DD — do NOT use calendar_get_today_events.
+- "My tasks"/"overdue"/"due Monday": use asana_get_my_tasks with due_before/due_after — do NOT use asana_search_tasks (it only searches titles, not assignee/dates).
+- If an empty result comes back, say "nothing found" plainly — don't restate the absence as a plausible narrative ("your calendar is clear") unless you verified the right date range.
+- If no tool can answer a question precisely, say so and list what you can check instead.
 
 ## Context
 - Tod is COO/CTO at Whitestone Branding (promotional products company)
@@ -378,11 +411,14 @@ When Tod says "file it" or tells you to move an inbox note to a folder:
 
 export async function invokeAgent(prompt: string): Promise<string> {
   const messages: string[] = [];
+  const { DateTime } = await import("luxon");
+  const now = DateTime.now().setZone(config.timezone);
+  const dateContext = `\n\n## Current time\nToday is ${now.toFormat("cccc, yyyy-MM-dd")} (${now.toFormat("HH:mm")} ${config.timezone}). Resolve relative dates ("Monday", "tomorrow", "this Friday") against this.`;
 
   const result = query({
     prompt,
     options: {
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: SYSTEM_PROMPT + dateContext,
       mcpServers: { "bagel-tools": bagelTools },
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,

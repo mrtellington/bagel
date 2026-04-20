@@ -21,16 +21,13 @@ const calendarClient = getCalendarClient();
 // Tod's calendar ID — typically the primary email
 const CALENDAR_ID = config.todAsanaEmail;
 
-export async function getTodayEvents() {
+export async function getEventsInRange(startIso: string, endIso: string) {
   if (!calendarClient) return [];
-  const now = DateTime.now().setZone(config.timezone);
-  const startOfDay = now.startOf("day").toISO();
-  const endOfDay = now.endOf("day").toISO();
 
   const res = await calendarClient.events.list({
     calendarId: CALENDAR_ID,
-    timeMin: startOfDay!,
-    timeMax: endOfDay!,
+    timeMin: startIso,
+    timeMax: endIso,
     singleEvents: true,
     orderBy: "startTime",
   });
@@ -46,6 +43,20 @@ export async function getTodayEvents() {
       responseStatus: a.responseStatus,
     })),
   }));
+}
+
+export async function getTodayEvents() {
+  const now = DateTime.now().setZone(config.timezone);
+  return getEventsInRange(now.startOf("day").toISO()!, now.endOf("day").toISO()!);
+}
+
+export async function getEventsForDate(dateStr: string) {
+  // dateStr: "YYYY-MM-DD" in Tod's timezone; supports "monday", "tomorrow" via agent-side resolution.
+  const day = DateTime.fromISO(dateStr, { zone: config.timezone });
+  if (!day.isValid) {
+    throw new Error(`Invalid date: ${dateStr} (${day.invalidReason})`);
+  }
+  return getEventsInRange(day.startOf("day").toISO()!, day.endOf("day").toISO()!);
 }
 
 export async function isInMeeting(): Promise<boolean> {

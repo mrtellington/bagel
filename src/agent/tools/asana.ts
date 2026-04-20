@@ -59,6 +59,39 @@ export async function searchTasks(query: string) {
   return result.data ?? [];
 }
 
+/**
+ * Fetch Tod's incomplete tasks from Asana, optionally filtered by due-date window.
+ * Uses /tasks with assignee=me + workspace + completed_since=now (returns incomplete only).
+ * Date filtering is client-side because /tasks doesn't support due_on range params.
+ */
+export async function getMyTasks(opts?: {
+  dueBefore?: string;  // YYYY-MM-DD inclusive
+  dueAfter?: string;   // YYYY-MM-DD inclusive
+  includeCompleted?: boolean;
+}) {
+  const params = new URLSearchParams({
+    assignee: "me",
+    workspace: "1201405786124364",
+    opt_fields: "name,due_on,due_at,projects.name,assignee.name,completed",
+    limit: "100",
+  });
+  if (!opts?.includeCompleted) {
+    params.set("completed_since", "now");
+  }
+
+  const result = await asanaFetch(`/tasks?${params}`);
+  let tasks: Array<{ due_on?: string | null; [k: string]: unknown }> = result.data ?? [];
+
+  if (opts?.dueBefore) {
+    tasks = tasks.filter((t) => t.due_on && t.due_on <= opts.dueBefore!);
+  }
+  if (opts?.dueAfter) {
+    tasks = tasks.filter((t) => t.due_on && t.due_on >= opts.dueAfter!);
+  }
+
+  return tasks;
+}
+
 export async function addComment(taskGid: string, text: string) {
   await asanaFetch(`/tasks/${taskGid}/stories`, {
     method: "POST",

@@ -4,6 +4,7 @@ import {
   listVaultFiles,
   parseNote,
   commitAndPush,
+  updateNoteFrontmatter,
 } from "../sources/obsidian.js";
 import {
   upsertObsidianNote,
@@ -39,6 +40,7 @@ export async function pollVault() {
 
   // Step 3: Process unprocessed inbox items
   const inboxFiles = files.filter((f) => f.startsWith("00-inbox/"));
+  const processedInThisRun: string[] = [];
   for (const filePath of inboxFiles) {
     try {
       const note = parseNote(filePath);
@@ -71,6 +73,7 @@ ${note.body.slice(0, 6000)}
 6. Update the note's frontmatter: set bagel-processed to true (vault_update_note)`;
 
       await invokeAgent(prompt);
+      processedInThisRun.push(filePath);
       console.log(`[poll-vault] Done: ${note.title}`);
     } catch (err) {
       console.error(`[poll-vault] Error processing ${filePath}:`, err);
@@ -92,7 +95,22 @@ ${note.body.slice(0, 6000)}
     }
   }
 
-  if (hasChanges || pendingWrites.length > 0) {
+  // Step 5: Safety net — ensure every note we invoked the agent on is marked
+  // processed on disk. The agent is not reliable about calling vault_update_note
+  // as the last step; this prevents infinite re-triage.
+  for (const filePath of processedInThisRun) {
+    try {
+      const fresh = parseNote(filePath);
+      if (!fresh.bagelProcessed) {
+        console.log(`[poll-vault] Safety net: marking ${filePath} bagel-processed=true (agent skipped)`);
+        updateNoteFrontmatter(filePath, { "bagel-processed": true });
+      }
+    } catch (err) {
+      console.error(`[poll-vault] Safety-net failed for ${filePath}:`, err);
+    }
+  }
+
+  if (hasChanges || pendingWrites.length > 0 || processedInThisRun.length > 0) {
     console.log(
       `[poll-vault] Synced ${files.length} files, processed inbox, committed ${pendingWrites.length} writes`
     );

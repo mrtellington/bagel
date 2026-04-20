@@ -35,14 +35,26 @@ function guardedJob(name: string, fn: () => Promise<void>) {
   };
 }
 
+function alwaysJob(name: string, fn: () => Promise<void>) {
+  return async () => {
+    console.log(`[scheduler] Running ${name}`);
+    try {
+      await fn();
+    } catch (err) {
+      console.error(`[scheduler] ${name} failed:`, err);
+    }
+  };
+}
+
 export function startScheduler() {
   console.log(`[scheduler] Starting (${config.timezone}, ${config.businessHoursStart}-${config.businessHoursEnd} M-F)`);
 
   // Poll Supabase for new meetings — every 5 minutes
   cron.schedule("*/5 * * * *", guardedJob("poll-meetings", pollMeetings));
 
-  // Poll Obsidian vault for new notes — every 5 minutes
-  cron.schedule("*/5 * * * *", guardedJob("poll-vault", pollVault));
+  // Poll Obsidian vault for new notes — every 5 minutes, 24/7
+  // (vault capture shouldn't wait until Monday if you clip over the weekend)
+  cron.schedule("*/5 * * * *", alwaysJob("poll-vault", pollVault));
 
   // Poll Slack threads for replies — every 2 minutes
   cron.schedule("*/2 * * * *", guardedJob("poll-threads", pollThreads));

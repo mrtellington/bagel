@@ -90,20 +90,35 @@ export function getInboxNotes(): ObsidianNote[] {
     .filter((n) => !n.bagelProcessed);
 }
 
-export function commitAndPush(filePath: string, content: string): void {
+export function commitAndPush(
+  operation: "create" | "update" | "delete",
+  filePath: string,
+  content: string | null
+): void {
   const fullPath = join(config.obsidianLocalPath, filePath);
-
-  mkdirSync(dirname(fullPath), { recursive: true });
-  writeFileSync(fullPath, content, "utf-8");
-
   const cwd = config.obsidianLocalPath;
-  try {
+
+  if (operation === "delete") {
+    if (!existsSync(fullPath)) {
+      console.log(`[obsidian] Delete skipped (file absent): ${filePath}`);
+      return;
+    }
+    execFileSync("git", ["rm", filePath], { cwd, stdio: "pipe" });
+  } else {
+    if (content === null) {
+      throw new Error(`commitAndPush ${operation} requires content`);
+    }
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content, "utf-8");
     execFileSync("git", ["add", filePath], { cwd, stdio: "pipe" });
-    execFileSync("git", ["commit", "-m", `bagel: ${filePath}`], { cwd, stdio: "pipe" });
+  }
+
+  try {
+    execFileSync("git", ["commit", "-m", `bagel: ${operation} ${filePath}`], { cwd, stdio: "pipe" });
     execFileSync("git", ["push"], { cwd, stdio: "pipe", timeout: 30_000 });
-    console.log(`[obsidian] Committed and pushed: ${filePath}`);
+    console.log(`[obsidian] Committed and pushed: ${operation} ${filePath}`);
   } catch (err) {
-    console.error(`[obsidian] Git commit/push failed for ${filePath}:`, err);
+    console.error(`[obsidian] Git commit/push failed for ${operation} ${filePath}:`, err);
     throw err;
   }
 }
@@ -115,7 +130,7 @@ export function updateNoteFrontmatter(
   const note = parseNote(filePath);
   const merged = { ...note.frontmatter, ...updates };
   const content = serializeFrontmatter(merged) + note.body;
-  commitAndPush(filePath, content);
+  commitAndPush("update", filePath, content);
 }
 
 // --- Internal helpers ---

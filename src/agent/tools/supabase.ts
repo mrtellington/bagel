@@ -169,7 +169,11 @@ export async function getUnprocessedObsidianInbox() {
   return data ?? [];
 }
 
-export async function enqueueObsidianWrite(operation: "create" | "update", filePath: string, content: string) {
+export async function enqueueObsidianWrite(
+  operation: "create" | "update" | "delete",
+  filePath: string,
+  content: string | null
+) {
   const { data, error } = await supabase
     .from("obsidian_queue")
     .insert({ operation, file_path: filePath, content })

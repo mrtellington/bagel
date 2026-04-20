@@ -9,6 +9,7 @@ import {
   upsertObsidianNote,
   getUncommittedObsidianWrites,
   markObsidianWriteCommitted,
+  deleteObsidianNote,
 } from "../agent/tools/supabase.js";
 
 export async function pollVault() {
@@ -80,11 +81,14 @@ ${note.body.slice(0, 6000)}
   const pendingWrites = await getUncommittedObsidianWrites();
   for (const entry of pendingWrites) {
     try {
-      commitAndPush(entry.file_path, entry.content);
+      commitAndPush(entry.operation, entry.file_path, entry.content);
       await markObsidianWriteCommitted(entry.id);
-      console.log(`[poll-vault] Committed queued write: ${entry.file_path}`);
+      if (entry.operation === "delete") {
+        await deleteObsidianNote(entry.file_path);
+      }
+      console.log(`[poll-vault] Committed queued write: ${entry.operation} ${entry.file_path}`);
     } catch (err) {
-      console.error(`[poll-vault] Failed to commit ${entry.file_path}:`, err);
+      console.error(`[poll-vault] Failed to commit ${entry.operation} ${entry.file_path}:`, err);
     }
   }
 

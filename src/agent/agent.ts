@@ -273,6 +273,18 @@ const vaultListRecentTool = tool(
   }
 );
 
+const vaultDeleteNoteTool = tool(
+  "vault_delete_note",
+  "Delete a note from the Obsidian vault. Use as the second half of a move: call vault_create_note for the new location first, then vault_delete_note for the original inbox path.",
+  {
+    file_path: z.string().describe("Relative vault path to delete, e.g. '00-inbox/2026-04-16-article.md'"),
+  },
+  async ({ file_path }) => {
+    const result = await vault.vaultDeleteNote({ filePath: file_path });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  }
+);
+
 // --- MCP Server ---
 
 const bagelTools = createSdkMcpServer({
@@ -283,7 +295,7 @@ const bagelTools = createSdkMcpServer({
     calendarGetToday, calendarIsInMeeting, calendarNextGap,
     dbGetUnprocessedMeetings, dbMarkMeetingProcessed, dbCreateActionItem,
     dbGetActionItems, dbUpdateActionItem, dbGetPendingItems, dbSearchMeetings,
-    vaultSearchTool, vaultCreateNoteTool, vaultUpdateNoteTool, vaultListRecentTool,
+    vaultSearchTool, vaultCreateNoteTool, vaultUpdateNoteTool, vaultListRecentTool, vaultDeleteNoteTool,
   ],
 });
 
@@ -354,7 +366,13 @@ When processing inbox items proactively:
 1. Summarize the content
 2. Suggest tags and a target folder
 3. Note any connections to existing vault notes
-4. Ask Tod if he wants to file it or discuss it further`;
+4. Ask Tod if he wants to file it or discuss it further
+
+When Tod says "file it" or tells you to move an inbox note to a folder:
+1. Call vault_create_note with the target folder (e.g. 10-articles), preserving title/source/tags and applying the tags you suggested
+2. Call vault_delete_note on the ORIGINAL inbox path to remove it from 00-inbox
+3. Both operations queue writes that commit on the next poll-vault cycle (≤5 min)
+4. Confirm with a brief Slack reply — include the new path. Don't say "moved" or "filed!" without calling both tools; moving is a two-step operation.`;
 
 // --- Agent invocation ---
 

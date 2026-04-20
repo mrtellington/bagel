@@ -25,7 +25,7 @@
 
 ## Current State Summary
 
-All Obsidian Brain code is implemented on the `feat/obsidian-brain` branch and deployed to the VM. The VM is running with `Vault: bagel-brain` in the startup log and Socket Mode connected. Two manual steps remain before the feature is fully functional: (1) run the Supabase migration to create the `obsidian_notes` and `obsidian_queue` tables, and (2) install Obsidian plugins (especially `obsidian-git` for vault sync). No code changes are needed.
+Obsidian Brain is fully operational end-to-end as of 2026-04-19. Migration 003 applied, Obsidian plugins installed (obsidian-git + Dataview + Templater + Web Clipper), full round-trip smoke test passed: Web Clipper → GitHub → VM pull → Supabase sync → agent triage → Slack DM → "file it" reply → file moved on GitHub. During the smoke test a **product bug** was found and fixed: the agent was claiming "filed/moved" but only calling `vault_create_note`, leaving the original in `00-inbox/` (no `vault_delete_note` tool existed). Added `vault_delete_note`, migration 004 (allows `'delete'` op in queue + nullable content), updated `commitAndPush` to handle deletes via `git rm`, updated poll-vault to reconcile the Supabase cache on delete, and updated the system prompt so "file it" performs a two-step create+delete. Deployed to VM and validated with a one-shot cleanup that moved the smoke-test article from `00-inbox` to `10-articles` and cleared the stale Supabase row.
 
 ## What Was Built
 
@@ -94,15 +94,24 @@ templates/      ← note templates
 
 ## Immediate Next Steps
 
-### 1. Run Supabase migration (REQUIRED before vault features work)
+### 1. Run Supabase migration ✅ DONE (2026-04-19)
 
-Go to Supabase dashboard → SQL Editor → paste contents of `supabase/migrations/003_obsidian_brain.sql` → Run.
+Applied via `PGPASSWORD='…' psql … -f supabase/migrations/003_obsidian_brain.sql` against project `ejaxcfnnavjsajdepfkw` (meeting-actions). Both tables verified via REST. Not recorded in `supabase_migrations.schema_migrations` — if using `supabase db push` in future, run `supabase migration repair --status applied 003` first.
 
-This creates two tables:
-- `obsidian_notes` — cache of parsed vault notes (file_path, title, tags, body, frontmatter)
-- `obsidian_queue` — write queue for pending vault commits
+### 2. Install Obsidian plugins ✅ DONE (2026-04-19)
 
-### 2. Install Obsidian plugins (REQUIRED for vault sync)
+Installed obsidian-git (Vinzent), Dataview, Templater, Web Clipper. Registry renamed obsidian-git to just "Git" — search by author "Vinzent" to find it. Web Clipper configured with vault `Obsidian`, default folder `00-inbox` on Default template.
+
+### 3. vault_delete_note tool + move semantics ✅ DONE (2026-04-19)
+
+Smoke test revealed the agent hallucinated "moved" when filing — only create existed, no delete tool. Added:
+- Migration `004_obsidian_delete_op.sql` (CHECK constraint allows `'delete'`; `content` nullable)
+- `vault.vaultDeleteNote` + `vault_delete_note` tool in agent
+- `commitAndPush(operation, filePath, content)` — `delete` does `git rm`, else write+add
+- `poll-vault.ts` step 4 reconciles Supabase `obsidian_notes` cache on delete
+- System prompt: "file it" must call both `vault_create_note` AND `vault_delete_note`
+
+### — Legacy step 2 (plugin install) details, kept for reference —
 
 In Obsidian app → Settings → Community plugins → Browse:
 
@@ -119,14 +128,9 @@ In Obsidian app → Settings → Community plugins → Browse:
 4. **Obsidian Web Clipper** — browser extension from Chrome Web Store
    - Configure to save to `00-inbox` folder
 
-### 3. Merge feature branch
+### 3. Merge feature branch ✅ DONE
 
-```bash
-cd /Users/todellington/bagel
-git checkout main
-git merge feat/obsidian-brain
-git push
-```
+PR #1 merged to main (commit 8e6b95b).
 
 ### 4. Smoke test (Task 11 from plan)
 
@@ -170,8 +174,7 @@ git push
 
 ## Blockers
 
-- **Supabase migration not yet run** — Tod must run 003_obsidian_brain.sql via SQL Editor
-- **Obsidian plugins not yet installed** — Tod must install obsidian-git, Dataview, Templater, Web Clipper
+None — feature is fully operational.
 
 ## Future Phases (Out of Scope)
 

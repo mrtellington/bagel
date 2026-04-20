@@ -98,3 +98,12 @@ export async function vaultUpdateNote(args: {
 export async function vaultListRecent(limit: number = 10) {
   return getRecentObsidianNotes(limit);
 }
+
+/**
+ * Delete a note from the vault. Writes to the queue; poll-vault commits it.
+ * Used as the second half of a "move" (create at new path, then delete at old).
+ */
+export async function vaultDeleteNote(args: { filePath: string }) {
+  const queued = await enqueueObsidianWrite("delete", args.filePath, null);
+  return { filePath: args.filePath, queued };
+}
